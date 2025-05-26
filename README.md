@@ -1,2 +1,90 @@
-# cloudsync
-Used to sync cloud files accross multiple machines. Specifically aimed at steam saved games.
+# CloudSync
+
+CloudSync is a Go-based application designed to synchronize save game files across multiple machines. It enables Steam games that only support host-based multiplayer (without dedicated servers) to share save files seamlessly. This allows any player to host the game even if the primary host is offline, ensuring a consistent and up-to-date game state for everyone.
+
+---
+
+## Features
+
+- Monitors a specified folder for changes to save files (`.sav` extension), excluding `EnhancedInputUserSettings.sav`.
+- Synchronizes changes to a central cloud storage (compatible with MinIO/S3).
+- Downloads newer cloud save files automatically.
+- Pauses synchronization when a specified process is running (e.g., the game executable).
+- Creates timestamped backups before overwriting local save files.
+- Initial sync on startup to ensure all saves are up to date both locally and in the cloud.
+
+---
+
+## Installation
+
+1. **Download or build the binary**
+
+   Clone the repository:
+
+   ```bash
+   git clone https://github.com/danielbehrens/cloudsync.git
+   cd cloudsync
+   go build -o cloudsync.exe main.go
+
+2. **Set up MinIO or compatible cloud storage**
+
+Follow MinIO quickstart guide to set up your own S3-compatible storage server. Take note of your:
+
+- Endpoint URL
+- Access key
+- Secret key
+- Bucket name
+
+**Usage**
+
+Run the executable with the following command-line arguments:
+
+| Argument        | Description                                                 | Example                         |
+|-----------------|-------------------------------------------------------------|---------------------------------|
+| `-watch-path`   | Path to the folder to monitor for save game changes         | `C:\Games\Saves`                |
+| `-process-name` | Name of the game process to pause sync while running        | `game.exe`                     |
+| `-backup-dir`   | Folder path where backups are stored (default `./backups`)  | `C:\CloudSync\Backups`          |
+| `-cloud-endpoint` | MinIO or S3 endpoint URL                                  | `http://127.0.0.1:9000`         |
+| `-access-key`   | Access key for cloud storage                                 | `minioadmin`                    |
+| `-secret-key`   | Secret key for cloud storage                                 | `minioadmin`                    |
+| `-bucket-name`  | Cloud storage bucket name                                   | `game-saves`                    |
+
+
+Example Command
+
+```powershell
+cloudsync.exe `
+  -watch-path "C:\Users\[YourUsername]\AppData\Local\RSDragonwilds\Saved\SaveGames" `
+  -backup-dir "C:\Users\[YourUsername]\AppData\Local\RSDragonwilds\Saved\SaveGames\Backups" `
+  -process-name "RSDragonwilds-Win64-Shipping.exe" `
+  -cloud-endpoint "http://127.0.0.1:9000" `
+  -access-key "minioadmin" `
+  -secret-key "minioadmin" `
+  -bucket-name "gamesync-dragonwilds"
+```
+
+3. **Running as a Windows Service**
+
+To run CloudSync as a Windows service, you can use NSSM (Non-Sucking Service Manager):
+
+Download NSSM from https://nssm.cc/download and extract it.
+
+Open an elevated Command Prompt and install the service:
+
+    nssm install CloudSync
+
+In the NSSM GUI that opens:
+
+Path: Browse to the cloudsync.exe executable.
+
+Startup directory: Folder containing cloudsync.exe.
+
+Arguments: Provide the same command-line arguments you would use on the command line, for example:
+
+    -watch-path "C:\Games\Saves" -process-name "game.exe" -backup-dir "C:\CloudSync\Backups" -cloud-endpoint "http://127.0.0.1:9000" -access-key "minioadmin" -secret-key "minioadmin" -bucket-name "game-saves"
+
+Click Install Service.
+
+Start the service via:
+
+    net start CloudSync
