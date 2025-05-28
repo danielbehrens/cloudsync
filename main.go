@@ -174,9 +174,10 @@ func checkCloudAndSync(ctx context.Context, client *minio.Client, filePath strin
 	stat, err := client.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
 	if err == nil {
 		cloudModTime := getCloudModTime(stat)
-
-		diff := cloudModTime.Sub(info.ModTime().UTC())
+		localFileTime := info.ModTime().UTC()
+		diff := cloudModTime.Sub(localFileTime)
 		if diff > timeTolerance {
+			log.Printf("file compare cloudtime: %v localfiletime: %v", cloudModTime, localFileTime)
 			log.Printf("Cloud has newer version of %s. Downloading...", objectName)
 			tempPath := filepath.Join(os.TempDir(), objectName+".cloud")
 			err := client.FGetObject(ctx, bucketName, objectName, tempPath, minio.GetObjectOptions{})
@@ -185,6 +186,7 @@ func checkCloudAndSync(ctx context.Context, client *minio.Client, filePath strin
 			}
 			return
 		} else if diff < -timeTolerance {
+			log.Printf("file compare cloudtime: %v localfiletime: %v", cloudModTime, localFileTime)
 			log.Printf("Local file %s is newer. Uploading...", objectName)
 			backupAndUpload(ctx, client, filePath)
 			return
