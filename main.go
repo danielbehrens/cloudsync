@@ -157,7 +157,7 @@ func syncFromCloud(ctx context.Context, client *minio.Client) {
 			backupAndReplace(localPath, tempPath)
 
 			// Restore original mod time from cloud
-			os.Chtimes(localPath, time.Now(), cloudModTime)
+			os.Chtimes(localPath, cloudModTime, cloudModTime)
 		}
 	}
 }
@@ -183,6 +183,9 @@ func checkCloudAndSync(ctx context.Context, client *minio.Client, filePath strin
 			err := client.FGetObject(ctx, bucketName, objectName, tempPath, minio.GetObjectOptions{})
 			if err == nil {
 				backupAndReplace(filePath, tempPath)
+
+				// Restore original mod time from cloud
+				os.Chtimes(filePath, cloudModTime, cloudModTime)
 			}
 			return
 		} else if diff < -timeTolerance {
@@ -281,7 +284,8 @@ func uploadToCloud(ctx context.Context, client *minio.Client, filePath, objectNa
 
 	// Store full Unix nanoseconds timestamp in metadata
 	userMeta := map[string]string{
-		"X-Amz-Meta-Modtime": fmt.Sprintf("%d", modTime.UnixNano()),
+		"X-Amz-Meta-Modtime":       fmt.Sprintf("%d", modTime.UnixNano()),
+		"X-Amz-Meta-ModtimeString": fmt.Sprintf("%v", modTime.Format("2006-01-02_15-04-05.000000")),
 	}
 
 	_, err = client.FPutObject(ctx, bucketName, objectName, filePath, minio.PutObjectOptions{
