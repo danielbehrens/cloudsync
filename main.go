@@ -128,7 +128,11 @@ func syncFromCloud(ctx context.Context, client *minio.Client) {
 		}
 
 		localPath := filepath.Join(watchPath, filepath.Base(objectName))
-		localInfo, _ := os.Stat(localPath)
+		localInfo, err := os.Stat(localPath)
+		if err != nil && !os.IsNotExist(err) {
+			log.Printf("Failed to stat local file %s: %v", localPath, err)
+			continue
+		}
 
 		// Fetch full metadata (including custom mod time)
 		stat, err := client.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
@@ -140,8 +144,7 @@ func syncFromCloud(ctx context.Context, client *minio.Client) {
 		cloudModTime := getCloudModTime(stat)
 
 		// If file doesn't exist locally or is older than cloud, replace it
-		diff := cloudModTime.Sub(localInfo.ModTime().UTC())
-		if diff > timeTolerance {
+		if localInfo == nil || cloudModTime.Sub(localInfo.ModTime().UTC()) > timeTolerance {
 			log.Printf("Cloud has newer version of %s. Downloading and replacing...", objectName)
 			tempPath := filepath.Join(os.TempDir(), objectName+".download")
 			err := client.FGetObject(ctx, bucketName, objectName, tempPath, minio.GetObjectOptions{})
@@ -196,25 +199,32 @@ func checkCloudAndSync(ctx context.Context, client *minio.Client, filePath strin
 }
 
 func backupAndReplace(localPath, newPath string) {
-	backupPath, err := createBackupTimeFolder()
-	if err != nil {
-		log.Printf("failed to create backup folder: %v", err)
-		return
-	}
+	if fileExists(localPath) {
+		backupPath, err := createBackupTimeFolder()
+		if err != nil {
+			log.Printf("failed to create backup folder: %v", err)
+			return
+		}
 
-	backupFile := filepath.Join(backupPath, filepath.Base(localPath))
-	err = copyFile(localPath, backupFile)
-	if err != nil {
-		log.Printf("failed to backup file %s to %s", localPath, backupFile)
-		return
+		backupFile := filepath.Join(backupPath, filepath.Base(localPath))
+		err = copyFile(localPath, backupFile)
+		if err != nil {
+			log.Printf("failed to backup file %s to %s", localPath, backupFile)
+			return
+		}
 	}
-	err = copyFile(newPath, localPath)
+	err := copyFile(newPath, localPath)
 	if err != nil {
 		log.Printf("failed to copy cloud file %s to %s", newPath, localPath)
 		return
 	}
 
 	log.Printf("replaced %s with cloud version", localPath)
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 func backupAndUpload(ctx context.Context, client *minio.Client, filePath string) {
