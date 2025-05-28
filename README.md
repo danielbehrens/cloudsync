@@ -2,6 +2,8 @@
 
 CloudSync is a Go-based application designed to synchronize save game files across multiple machines. It enables Steam games that only support host-based multiplayer (without dedicated servers) to share save files seamlessly. This allows any player to host the game even if the primary host is offline, ensuring a consistent and up-to-date game state for everyone.
 
+Current configuration specifically targets Runescape: Dragonwilds
+
 ---
 
 ## Features
